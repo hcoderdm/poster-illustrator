@@ -1,0 +1,21 @@
+{
+  "name": "map-art",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "fonts": "node scripts/fonts.mjs"
+  },
+  "dependencies": {
+    "@mapbox/vector-tile": "^2.0.5",
+    "maplibre-gl": "^5.24.0",
+    "pbf": "^4.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}
