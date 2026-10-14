@@ -26,26 +26,36 @@ The header has the place search, the view mode, the on-screen resolution and an 
   - **Preview** is the poster exactly as it will export. Labels poking out of the frame are nudged inside or hidden.
 - **Resolution** (0.5×–2×) is for the screen only; **Export PNG** always renders at full print size.
 
-The panel sections all work the same way. Each row has a number box with up/down arrows and a ↺ reset button, layers and classes are collapsible groups with a visibility checkbox, and every section has **Reset section**.
+The panel has three groups. Every row has a number box with up/down arrows and a ↺ reset button, layers and label classes are collapsible groups with a visibility checkbox, and every section has **Reset section**.
 
-- **Presets & themes**: 11 colour themes, named presets saved in the browser, and JSON download and upload.
-- **Poster size & export**: width, height, unit and DPI. 18×24 in at 300 DPI (5400×7200 px) takes a few seconds. Each side is capped at the GPU's limit (16384 px on Apple Silicon).
-- **Poster layout**:
-  - Margins, with a single or double border.
+**Poster**
+
+- **Size & export**: width, height, unit and DPI, and **Export PNG**. 18×24 in at 300 DPI (5400×7200 px) takes a few seconds. Each side is capped at the GPU's limit (16384 px on Apple Silicon).
+- **Layout**:
+  - Margins (plain white when printed) and a single or double border.
+  - **Searched place position**: optionally place the searched place off-centre, by a percentage of the distance from the map's centre to its edge (for example 33% up).
+- **Title & credits**:
   - A title (the searched place by default) with subtitle, font, size, spacing, case, alignment and nudge.
-  - A footer with credits bottom-left and the month and year bottom-right.
-  - The margins are plain white with no paper texture, so prints have a clean border.
-  - The default credit follows each project's print attribution guidelines: OpenStreetMap with its ODbL licence and the printed URL openstreetmap.org/copyright, © OpenMapTiles with openmaptiles.org, and OpenFreeMap.
-- **Colour & paper**: overall brightness, contrast, saturation, hue, warmth and fade, which shift every colour at once. Also the base colours and the paper grain, which is applied to the map only.
-- **Water**: the engraved shoreline rings (number of lines, spacing, growth, width, fade, shoreline, hand-drawn wobble), the water tint, and whether lakes and rivers get rings too.
+  - Credits bottom-left and the month and year bottom-right. The default credit follows each project's print attribution guidelines: OpenStreetMap with its ODbL licence and the printed URL openstreetmap.org/copyright, © OpenMapTiles with openmaptiles.org, and OpenFreeMap.
+
+**Map style** (ordered the way the map is drawn, from the bottom up)
+
+- **Colour & paper**: one of 11 colour themes; overall brightness, contrast, saturation, hue, warmth and fade, which shift every colour at once; base colours; and paper grain, which is applied to the map only.
+- **Water**: the tint, whether lakes and rivers count, and the engraved shoreline rings (number of lines, spacing, growth, width, fade, shoreline, hand-drawn wobble).
+- **Land & buildings**: each area class has a fill, an engraved pattern (hatch, cross-hatch, dots, stipple and more) and a border. Buildings sit on an opaque base, can show individual houses, and can appear from zoom 10.
+- **Roads & lines**:
+  - Road data: *standard*, *more* or *all*. Residential streets start at zoom 12 in the data, and service roads and paths at 13.
+  - Each road type, railway, runway, river and boundary has its own colour, width, minimum width, opacity, dash style and minimum zoom.
 - **Labels**:
-  - Label data (*standard*, *more*, or *all*, which merges names from detailed tiles so small places show when zoomed out), spacing and overlaps.
-  - Fonts per class, including **Add a Google Font**, which works under `npm run dev` only.
-  - Case, letter spacing and curves; halo distance, blur, opacity and colour.
-  - Frame fitting, the searched place's size, and per-class size and minimum zoom.
-  - Places of interest such as schools, churches and museums, by category.
-- **Roads & lines**: Road data (*standard*, *more* or *all*: residential streets start at zoom 12 in the data, and service roads and paths at 13). Each road type, railway, runway, river and boundary has its own colour, width, minimum width, opacity, dash style and minimum zoom.
-- **Areas & buildings**: each class has a fill, an engraved pattern (hatch, cross-hatch, dots, stipple and more) and a border. Buildings sit on an opaque base, can show individual houses, and can appear from zoom 10.
+  - Fonts per class, including **Add a Google Font** (works under `npm run dev` only).
+  - Lettering (case, spacing, curves) and halo (colour, distance, blur, opacity).
+  - Per-class size and minimum zoom.
+  - Places of interest (schools, churches, museums…) by category.
+- **Label placement**: Label data (*standard*, *more* or *all*, which merges names from detailed tiles so small places show when zoomed out), density, fitting to the frame, and the searched place's size.
+
+**Saved settings**
+
+- **Presets & files**: named presets saved in the browser, JSON download and upload, and reset all.
 
 ## How it works
 
