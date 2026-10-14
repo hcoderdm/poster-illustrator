@@ -1,5 +1,10 @@
 # Map Art
 
+![Status: work in progress](https://img.shields.io/badge/status-work%20in%20progress-yellow)
+
+> [!WARNING]
+> **Work in progress.** Features, settings and saved presets may change or break between versions.
+
 An interactive map styled after 19th-century engraved maps, for exporting print-resolution poster PNGs. It uses OpenStreetMap data through OpenFreeMap vector tiles, so no API key is needed.
 
 ## Inspiration
