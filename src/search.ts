@@ -9,13 +9,8 @@ interface Hit {
   boundingbox: [string, string, string, string]; // south, north, west, east
 }
 
-/** Nominatim place search (on Enter only, per its usage policy); a result is centred in the frame and fitted to it. */
-export function createSearch(
-  map: MLMap,
-  getFrame: () => Rect,
-  stage: HTMLElement,
-  onPick: (name: string) => void,
-): HTMLElement {
+/** Nominatim place search (on Enter only, per its usage policy); onPick gets the place and a zoom that fits it in the frame. */
+export function createSearch(map: MLMap, getFrame: () => Rect, stage: HTMLElement, onPick: (name: string, at: [number, number], zoom: number) => void): HTMLElement {
   const input = el('input', { type: 'search', placeholder: 'Search a place and press Enter…', 'aria-label': 'Search a place' }) as HTMLInputElement;
   const results = el('ul', { class: 'search-results', hidden: '' });
   const form = el('form', { class: 'search' }, input, results);
@@ -36,9 +31,7 @@ export function createSearch(
       right: stage.clientWidth - f.x - f.width + pad,
     };
     const cam = map.cameraForBounds(new maplibregl.LngLatBounds([w, s], [e, n]), { padding });
-    // The frame is centred on the stage, so the map centre is the frame centre.
-    map.flyTo({ center: [+hit.lon, +hit.lat], zoom: Math.min(cam?.zoom ?? 13, 15), bearing: map.getBearing(), duration: 1400 });
-    onPick(hit.display_name.split(',')[0].trim());
+    onPick(hit.display_name.split(',')[0].trim(), [+hit.lon, +hit.lat], Math.min(cam?.zoom ?? 13, 15));
   }
 
   form.onsubmit = async (ev) => {

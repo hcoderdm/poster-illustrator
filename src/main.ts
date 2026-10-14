@@ -176,6 +176,7 @@ function apply(kind: ChangeKind | 'all' | 'init') {
     applyStyle(true);
   }
   if (is('mode', 'quality', 'all', 'init')) syncModeUI();
+  if (is('target')) showTarget();
   // The water's wobble noise is anchored to the map area, so frame changes re-engrave too.
   if (is('mask', 'all')) water.update(true);
   else if (is('water', 'palette', 'mode', 'quality', 'frame')) water.update(false);
@@ -221,9 +222,21 @@ new ResizeObserver(() => {
 
 // --- header: search, view mode, resolution, zoom ----------------------------
 const header = document.getElementById('header-tools')!;
+// Puts the searched place at the frame centre, or offset toward the edges if enabled (the frame is centred on the stage).
+function showTarget(zoom?: number) {
+  const t = settings.target;
+  if (!t.at) return;
+  const m = frameRect();
+  const offset: [number, number] = t.offset ? [(t.right / 100) * (m.width / 2), (-t.up / 100) * (m.height / 2)] : [0, 0];
+  if (zoom === undefined) map.easeTo({ center: t.at, offset, duration: 0 });
+  else map.flyTo({ center: t.at, zoom, offset, bearing: map.getBearing(), duration: 1400 });
+}
+
 header.append(
-  createSearch(map, frameRect, stage, (name) => {
+  createSearch(map, frameRect, stage, (name, at, zoom) => {
     settings.labels.searchedName = name;
+    settings.target.at = at;
+    showTarget(zoom);
     panel.refresh();
     apply('style');
   }),
@@ -331,16 +344,20 @@ function setSettings(next: Settings) {
   apply('all');
 }
 
-function presetControls(): HTMLElement {
-  const themeSel = el('select', {}, el('option', { value: '' }, 'Apply colour theme…'), ...Object.keys(THEMES).map((k) => el('option', { value: k }, k))) as HTMLSelectElement;
-  themeSel.onchange = () => {
-    if (!themeSel.value) return;
-    settings = applyTheme(settings, THEMES[themeSel.value]);
-    themeSel.value = '';
+// Applies a colour theme to the palette and every layer's colours.
+function themeControl(): HTMLElement {
+  const sel = el('select', {}, el('option', { value: '' }, 'Choose…'), ...Object.keys(THEMES).map((k) => el('option', { value: k }, k))) as HTMLSelectElement;
+  sel.onchange = () => {
+    if (!sel.value) return;
+    settings = applyTheme(settings, THEMES[sel.value]);
+    sel.value = '';
     panel.refresh();
     apply('palette');
   };
+  return el('label', { class: 'row select' }, el('span', {}, 'Theme'), sel);
+}
 
+function presetControls(): HTMLElement {
   const savedSel = el('select') as HTMLSelectElement;
   const fillSaved = () => {
     const presets = loadPresets();
@@ -394,7 +411,6 @@ function presetControls(): HTMLElement {
   return el(
     'div',
     { class: 'presets' },
-    themeSel,
     savedSel,
     el('div', { class: 'btns' }, saveBtn, delBtn),
     el('div', { class: 'btns' }, exportJson, importJson, reset),
@@ -450,10 +466,11 @@ const fontPicker: Control = {
     }),
 };
 
+const POSTER = 'Poster', STYLE = 'Map style', SAVED = 'Saved settings';
 const sections: Section[] = [
-  { title: 'Presets & themes', controls: [{ type: 'custom', render: presetControls }] },
   {
-    title: 'Poster size & export',
+    group: POSTER,
+    title: 'Size & export',
     open: true,
     controls: [
       { type: 'number', path: 'export.width', label: 'Width', step: 0.25 },
@@ -465,9 +482,10 @@ const sections: Section[] = [
     ],
   },
   {
-    title: 'Poster layout',
+    group: POSTER,
+    title: 'Layout',
     controls: [
-      { type: 'note', text: 'Shown in Preview mode and the export. Lengths are in the poster unit; text sizes in points.' },
+      { type: 'note', text: 'Margins, border and text show in Preview and the export; margins print plain white. Lengths are in the poster unit.' },
       { type: 'heading', text: 'Margins' },
       { type: 'number', path: 'poster.margins.top', label: 'Top', min: 0, step: 0.1 },
       { type: 'number', path: 'poster.margins.bottom', label: 'Bottom', min: 0, step: 0.1 },
@@ -476,6 +494,17 @@ const sections: Section[] = [
       { type: 'heading', text: 'Border' },
       { type: 'select', path: 'poster.border', label: 'Style', options: ['none', 'single', 'double'] },
       { type: 'range', path: 'poster.borderWidth', label: 'Weight (pt)', min: 0.25, max: 6, step: 0.05 },
+      { type: 'heading', text: 'Searched place position' },
+      { type: 'toggle', path: 'target.offset', label: 'Offset from centre' },
+      { type: 'range', path: 'target.up', label: 'Up (%)', min: -100, max: 100, step: 1 },
+      { type: 'range', path: 'target.right', label: 'Right (%)', min: -100, max: 100, step: 1 },
+      { type: 'note', text: () => (settings.target.at ? 'Percent of the distance from the map centre to its edge; negative moves down or left.' : 'Search for a place first; it will then sit here instead of the centre.') },
+    ],
+  },
+  {
+    group: POSTER,
+    title: 'Title & credits',
+    controls: [
       { type: 'heading', text: 'Title' },
       { type: 'toggle', path: 'poster.title.show', label: 'Show' },
       { type: 'text', path: 'poster.title.text', label: 'Text', placeholder: () => settings.labels.searchedName || 'Searched place' },
@@ -487,7 +516,7 @@ const sections: Section[] = [
       { type: 'toggle', path: 'poster.title.uppercase', label: 'Uppercase' },
       { type: 'select', path: 'poster.title.align', label: 'Align', options: ['left', 'center', 'right'] },
       { type: 'range', path: 'poster.title.offset', label: 'Nudge (pt)', min: -200, max: 200, step: 1 },
-      { type: 'heading', text: 'Footer' },
+      { type: 'heading', text: 'Credits & date' },
       { type: 'toggle', path: 'poster.footer.attribution', label: 'Credits (left)' },
       { type: 'text', path: 'poster.footer.attributionText', label: 'Credit text', placeholder: DEFAULT_ATTRIBUTION },
       { type: 'note', text: 'Leave empty for the default credit, which follows each project’s print guidelines: OpenStreetMap with its ODbL licence and the printed URL openstreetmap.org/copyright, and “© OpenMapTiles” with openmaptiles.org. A custom credit should keep those parts and stay legible (about 8 pt or larger).' },
@@ -495,12 +524,14 @@ const sections: Section[] = [
       { type: 'text', path: 'poster.footer.dateText', label: 'Date text', placeholder: () => currentMonthYear() },
       fontSelect('poster.footer.font', 'Font'),
       { type: 'range', path: 'poster.footer.size', label: 'Size (pt)', min: 5, max: 60, step: 0.5 },
-      { type: 'range', path: 'poster.footer.offset', label: 'Gap below (pt)', min: 0, max: 144, step: 1 },
+      { type: 'range', path: 'poster.footer.offset', label: 'Gap below map (pt)', min: 0, max: 144, step: 1 },
     ],
   },
   {
+    group: STYLE,
     title: 'Colour & paper',
     controls: [
+      { type: 'custom', render: themeControl },
       { type: 'heading', text: 'Overall adjustments' },
       { type: 'range', path: 'adjust.brightness', label: 'Brightness', min: -1, max: 1, step: 0.01 },
       { type: 'range', path: 'adjust.contrast', label: 'Contrast', min: -1, max: 1, step: 0.01 },
@@ -518,100 +549,40 @@ const sections: Section[] = [
     ],
   },
   {
+    group: STYLE,
     title: 'Water',
     controls: [
-      { type: 'heading', text: 'Engraved lines' },
-      { type: 'toggle', path: 'water.enabled', label: 'Show' },
-      { type: 'range', path: 'water.rings', label: 'Number of lines', min: 0, max: 200, step: 1 },
-      { type: 'range', path: 'water.spacing', label: 'Spacing', min: 0.8, max: 15, step: 0.1 },
-      { type: 'range', path: 'water.growth', label: 'Spacing growth', min: 1, max: 1.4, step: 0.005 },
-      { type: 'range', path: 'water.lineWidth', label: 'Line width', min: 0.15, max: 4, step: 0.05 },
-      { type: 'range', path: 'water.falloff', label: 'Fade-out', min: 0, max: 5, step: 0.05 },
-      { type: 'range', path: 'water.opacity', label: 'Opacity', min: 0, max: 1, step: 0.01 },
-      { type: 'range', path: 'water.shoreWidth', label: 'Shoreline width', min: 0, max: 5, step: 0.05 },
-      { type: 'range', path: 'water.jitter', label: 'Hand wobble', min: 0, max: 1.5, step: 0.01 },
-      { type: 'range', path: 'water.jitterScale', label: 'Wobble size', min: 5, max: 300, step: 1 },
-      { type: 'color', path: 'palette.waterLines', label: 'Colour' },
       { type: 'heading', text: 'Fill' },
       { type: 'color', path: 'palette.water', label: 'Tint' },
       { type: 'range', path: 'water.fillOpacity', label: 'Tint opacity', min: 0, max: 1, step: 0.01 },
       { type: 'toggle', path: 'water.inland', label: 'Lakes & rivers too' },
+      { type: 'heading', text: 'Engraved lines' },
+      { type: 'toggle', path: 'water.enabled', label: 'Show' },
+      { type: 'color', path: 'palette.waterLines', label: 'Colour' },
+      { type: 'range', path: 'water.rings', label: 'Number of lines', min: 0, max: 200, step: 1 },
+      { type: 'range', path: 'water.spacing', label: 'Spacing', min: 0.8, max: 15, step: 0.1 },
+      { type: 'range', path: 'water.growth', label: 'Spacing growth', min: 1, max: 1.4, step: 0.005 },
+      { type: 'range', path: 'water.lineWidth', label: 'Line width', min: 0.15, max: 4, step: 0.05 },
+      { type: 'range', path: 'water.opacity', label: 'Opacity', min: 0, max: 1, step: 0.01 },
+      { type: 'range', path: 'water.falloff', label: 'Fade-out', min: 0, max: 5, step: 0.05 },
+      { type: 'range', path: 'water.shoreWidth', label: 'Shoreline width', min: 0, max: 5, step: 0.05 },
+      { type: 'range', path: 'water.jitter', label: 'Hand wobble', min: 0, max: 1.5, step: 0.01 },
+      { type: 'range', path: 'water.jitterScale', label: 'Wobble size', min: 5, max: 300, step: 1 },
     ],
   },
   {
-    title: 'Labels',
+    group: STYLE,
+    title: 'Land & buildings',
     controls: [
-      { type: 'heading', text: 'Data' },
-      { type: 'select', path: 'labels.detail', label: 'Label data', options: DETAILS },
-      { type: 'note', text: 'standard: what each zoom normally includes. more: suburbs and hamlets at every zoom (from zoom 7). all: every neighbourhood and place of interest (from zoom 10), slower when zoomed out. Then lower each class’s Min zoom.' },
-      { type: 'range', path: 'labels.padding', label: 'Spacing', min: 0, max: 30, step: 0.5 },
-      { type: 'toggle', path: 'labels.allowOverlap', label: 'Allow overlaps' },
-      { type: 'heading', text: 'Fonts' },
-      fontSelect('labels.capitalFont', 'Capitals'),
-      fontSelect('labels.cityFont', 'Cities'),
-      fontSelect('labels.placeFont', 'Towns'),
-      fontSelect('labels.waterFont', 'Water'),
-      fontSelect('labels.streetFont', 'Streets'),
-      fontSelect('labels.poiFont', 'Places of interest'),
-      { type: 'group', label: 'Add a Google Font', controls: [fontPicker] },
-      { type: 'heading', text: 'Style' },
-      { type: 'toggle', path: 'labels.uppercase', label: 'Uppercase' },
-      { type: 'range', path: 'labels.letterSpacing', label: 'Letter spacing', min: 0, max: 1.2, step: 0.01 },
-      { type: 'range', path: 'labels.placeCurve', label: 'Curve: places', min: -1, max: 1, step: 0.01 },
-      { type: 'range', path: 'labels.waterCurve', label: 'Curve: water', min: -1, max: 1, step: 0.01 },
-      { type: 'heading', text: 'Halo' },
-      { type: 'range', path: 'labels.haloWidth', label: 'Distance', min: 0, max: 8, step: 0.1 },
-      { type: 'range', path: 'labels.haloBlur', label: 'Blur radius', min: 0, max: 8, step: 0.1 },
-      { type: 'range', path: 'labels.haloOpacity', label: 'Opacity', min: 0, max: 1, step: 0.01 },
-      { type: 'color', path: 'palette.halo', label: 'Colour' },
-      { type: 'heading', text: 'Fitting to the frame' },
-      { type: 'range', path: 'labels.framePadding', label: 'Edge padding', min: 0, max: 60, step: 1 },
-      { type: 'range', path: 'labels.maxShift', label: 'Max nudge', min: 0, max: 400, step: 5 },
-      { type: 'heading', text: 'Searched place' },
-      { type: 'custom', render: searchedInfo },
-      { type: 'range', path: 'labels.searchedScale', label: 'Size', min: 0.5, max: 4, step: 0.05 },
-      { type: 'heading', text: 'Classes' },
-      { type: 'labelClass', path: 'labels.capital', label: 'Capitals' },
-      { type: 'labelClass', path: 'labels.city', label: 'Cities' },
-      { type: 'labelClass', path: 'labels.town', label: 'Towns' },
-      { type: 'labelClass', path: 'labels.village', label: 'Villages' },
-      { type: 'labelClass', path: 'labels.suburb', label: 'Neighbourhoods' },
-      { type: 'labelClass', path: 'labels.island', label: 'Islands' },
-      { type: 'labelClass', path: 'labels.water', label: 'Water bodies' },
-      { type: 'labelClass', path: 'labels.street', label: 'Streets' },
-      { type: 'labelClass', path: 'labels.poi', label: 'Places of interest' },
-      {
-        type: 'group',
-        label: 'Place-of-interest options',
-        controls: [
-          { type: 'toggle', path: 'labels.poiMarker', label: 'Dot marker' },
-          ...(Object.keys(POI_GROUPS) as PoiGroup[]).map((g): Control => ({ type: 'toggle', path: `labels.poiGroups.${g}`, label: g[0].toUpperCase() + g.slice(1) })),
-          { type: 'note', text: 'Place-of-interest names only exist in zoom-14 data; set Label data to “all” to see them zoomed out.' },
-        ],
-      },
-    ],
-  },
-  {
-    title: 'Roads & lines',
-    controls: [
-      { type: 'heading', text: 'Data' },
-      { type: 'select', path: 'layers.roadDetail', label: 'Road data', options: DETAILS },
-      { type: 'note', text: 'Residential streets start at zoom 12 in the map data; service roads (school drives, parking aisles) and paths at 13. more: residential streets from zoom 8. all: every road and path from zoom 10, slower when zoomed out. Then lower each type’s Min zoom and raise its Min width.' },
-      { type: 'heading', text: 'Layers' },
-      { type: 'line', path: 'layers.motorway', label: 'Highways', extras: [{ type: 'toggle', path: 'layers.motorway.double', label: 'Double-ruled' }] },
-      { type: 'line', path: 'layers.major', label: 'Major roads' },
-      { type: 'line', path: 'layers.minor', label: 'Residential streets' },
-      { type: 'line', path: 'layers.service', label: 'Service roads & drives' },
-      { type: 'line', path: 'layers.path', label: 'Paths & tracks' },
-      { type: 'line', path: 'layers.rail', label: 'Railways', extras: [{ type: 'toggle', path: 'layers.rail.ties', label: 'Cross-ties' }] },
-      { type: 'line', path: 'layers.runway', label: 'Runways', extras: [{ type: 'toggle', path: 'layers.runway.taxiways', label: 'Taxiways' }] },
-      { type: 'line', path: 'layers.waterway', label: 'Rivers & streams' },
-      { type: 'line', path: 'layers.boundary', label: 'Boundaries' },
-    ],
-  },
-  {
-    title: 'Areas & buildings',
-    controls: [
+      { type: 'area', path: 'layers.landuse', label: 'Residential areas' },
+      { type: 'area', path: 'layers.industrial', label: 'Commercial & industrial' },
+      { type: 'area', path: 'layers.institution', label: 'Schools, colleges, hospitals' },
+      { type: 'area', path: 'layers.park', label: 'Parks & cemeteries' },
+      { type: 'area', path: 'layers.recreation', label: 'Sports grounds & playgrounds' },
+      { type: 'area', path: 'layers.grass', label: 'Grass & farmland' },
+      { type: 'area', path: 'layers.wood', label: 'Woods' },
+      { type: 'area', path: 'layers.wetland', label: 'Wetlands' },
+      { type: 'area', path: 'layers.airport', label: 'Airport grounds' },
       {
         type: 'area',
         path: 'layers.building',
@@ -627,17 +598,88 @@ const sections: Section[] = [
           );
         },
       },
-      { type: 'area', path: 'layers.landuse', label: 'Residential areas' },
-      { type: 'area', path: 'layers.industrial', label: 'Commercial & industrial' },
-      { type: 'area', path: 'layers.institution', label: 'Schools, colleges, hospitals' },
-      { type: 'area', path: 'layers.park', label: 'Parks & cemeteries' },
-      { type: 'area', path: 'layers.recreation', label: 'Sports grounds & playgrounds' },
-      { type: 'area', path: 'layers.grass', label: 'Grass & farmland' },
-      { type: 'area', path: 'layers.wood', label: 'Woods' },
-      { type: 'area', path: 'layers.wetland', label: 'Wetlands' },
-      { type: 'area', path: 'layers.airport', label: 'Airport grounds' },
     ],
   },
+  {
+    group: STYLE,
+    title: 'Roads & lines',
+    controls: [
+      { type: 'select', path: 'layers.roadDetail', label: 'Road data', options: DETAILS },
+      { type: 'note', text: 'Residential streets start at zoom 12 in the map data; service roads (school drives, parking aisles) and paths at 13. more: residential streets from zoom 8. all: every road and path from zoom 10, slower when zoomed out. Then lower each type’s Min zoom and raise its Min width.' },
+      { type: 'heading', text: 'Roads' },
+      { type: 'line', path: 'layers.motorway', label: 'Highways', extras: [{ type: 'toggle', path: 'layers.motorway.double', label: 'Double-ruled' }] },
+      { type: 'line', path: 'layers.major', label: 'Major roads' },
+      { type: 'line', path: 'layers.minor', label: 'Residential streets' },
+      { type: 'line', path: 'layers.service', label: 'Service roads & drives' },
+      { type: 'line', path: 'layers.path', label: 'Paths & tracks' },
+      { type: 'heading', text: 'Other lines' },
+      { type: 'line', path: 'layers.rail', label: 'Railways', extras: [{ type: 'toggle', path: 'layers.rail.ties', label: 'Cross-ties' }] },
+      { type: 'line', path: 'layers.runway', label: 'Runways', extras: [{ type: 'toggle', path: 'layers.runway.taxiways', label: 'Taxiways' }] },
+      { type: 'line', path: 'layers.waterway', label: 'Rivers & streams' },
+      { type: 'line', path: 'layers.boundary', label: 'Boundaries' },
+    ],
+  },
+  {
+    group: STYLE,
+    title: 'Labels',
+    controls: [
+      { type: 'heading', text: 'Fonts' },
+      fontSelect('labels.capitalFont', 'Capitals'),
+      fontSelect('labels.cityFont', 'Cities'),
+      fontSelect('labels.placeFont', 'Towns'),
+      fontSelect('labels.waterFont', 'Water'),
+      fontSelect('labels.streetFont', 'Streets'),
+      fontSelect('labels.poiFont', 'Places of interest'),
+      { type: 'group', label: 'Add a Google Font', controls: [fontPicker] },
+      { type: 'heading', text: 'Lettering' },
+      { type: 'toggle', path: 'labels.uppercase', label: 'Uppercase' },
+      { type: 'range', path: 'labels.letterSpacing', label: 'Letter spacing', min: 0, max: 1.2, step: 0.01 },
+      { type: 'range', path: 'labels.placeCurve', label: 'Curve: places', min: -1, max: 1, step: 0.01 },
+      { type: 'range', path: 'labels.waterCurve', label: 'Curve: water', min: -1, max: 1, step: 0.01 },
+      { type: 'heading', text: 'Halo' },
+      { type: 'color', path: 'palette.halo', label: 'Colour' },
+      { type: 'range', path: 'labels.haloWidth', label: 'Distance', min: 0, max: 8, step: 0.1 },
+      { type: 'range', path: 'labels.haloBlur', label: 'Blur radius', min: 0, max: 8, step: 0.1 },
+      { type: 'range', path: 'labels.haloOpacity', label: 'Opacity', min: 0, max: 1, step: 0.01 },
+      { type: 'heading', text: 'Classes' },
+      { type: 'labelClass', path: 'labels.capital', label: 'Capitals' },
+      { type: 'labelClass', path: 'labels.city', label: 'Cities' },
+      { type: 'labelClass', path: 'labels.town', label: 'Towns' },
+      { type: 'labelClass', path: 'labels.village', label: 'Villages' },
+      { type: 'labelClass', path: 'labels.suburb', label: 'Neighbourhoods' },
+      { type: 'labelClass', path: 'labels.island', label: 'Islands' },
+      { type: 'labelClass', path: 'labels.water', label: 'Water bodies' },
+      { type: 'labelClass', path: 'labels.street', label: 'Streets' },
+      { type: 'labelClass', path: 'labels.poi', label: 'Places of interest' },
+      {
+        type: 'group',
+        label: 'Place-of-interest categories',
+        controls: [
+          { type: 'toggle', path: 'labels.poiMarker', label: 'Dot marker' },
+          ...(Object.keys(POI_GROUPS) as PoiGroup[]).map((g): Control => ({ type: 'toggle', path: `labels.poiGroups.${g}`, label: g[0].toUpperCase() + g.slice(1) })),
+          { type: 'note', text: 'Place-of-interest names only exist in zoom-14 data; set Label data to “all” to see them zoomed out.' },
+        ],
+      },
+    ],
+  },
+  {
+    group: STYLE,
+    title: 'Label placement',
+    controls: [
+      { type: 'select', path: 'labels.detail', label: 'Label data', options: DETAILS },
+      { type: 'note', text: 'standard: what each zoom normally includes. more: suburbs and hamlets at every zoom (from zoom 7). all: every neighbourhood and place of interest (from zoom 10), slower when zoomed out. Then lower each class’s Min zoom under Labels.' },
+      { type: 'heading', text: 'Density' },
+      { type: 'range', path: 'labels.padding', label: 'Spacing', min: 0, max: 30, step: 0.5 },
+      { type: 'toggle', path: 'labels.allowOverlap', label: 'Allow overlaps' },
+      { type: 'heading', text: 'Fitting to the frame' },
+      { type: 'range', path: 'labels.framePadding', label: 'Edge padding', min: 0, max: 60, step: 1 },
+      { type: 'range', path: 'labels.maxShift', label: 'Max nudge', min: 0, max: 400, step: 5 },
+      { type: 'heading', text: 'Searched place' },
+      { type: 'custom', render: searchedInfo },
+      { type: 'range', path: 'labels.searchedScale', label: 'Size', min: 0.5, max: 4, step: 0.05 },
+    ],
+  },
+  { group: SAVED, title: 'Presets & files', controls: [{ type: 'custom', render: presetControls }] },
 ];
 
 const panel = new Panel(document.getElementById('panel-body')!, S, (_path, kind) => apply(kind), DEFAULTS);

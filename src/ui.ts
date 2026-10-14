@@ -2,7 +2,7 @@
 
 import { DASHES, PATTERNS, type Settings } from './settings';
 
-export type ChangeKind = 'style' | 'water' | 'mask' | 'grain' | 'frame' | 'palette' | 'mode' | 'quality' | 'none';
+export type ChangeKind = 'style' | 'water' | 'mask' | 'grain' | 'frame' | 'palette' | 'mode' | 'quality' | 'target' | 'none';
 
 type Path = string;
 
@@ -22,6 +22,7 @@ export type Control =
   | { type: 'custom'; render: () => HTMLElement };
 
 export interface Section {
+  group: string; // sections sharing a group sit under one divider heading
   title: string;
   open?: boolean;
   controls: Control[];
@@ -42,6 +43,7 @@ function kindFor(path: Path): ChangeKind {
   if (path === 'mode') return 'mode';
   if (path === 'previewQuality') return 'quality';
   if (path === 'water.inland') return 'mask';
+  if (path.startsWith('target.')) return 'target';
   if (path.startsWith('palette.') || path.startsWith('adjust.')) return 'palette';
   if (path.startsWith('water.')) return 'water';
   if (path.startsWith('layers.') || path.startsWith('labels.')) return 'style';
@@ -79,7 +81,9 @@ export class Panel {
   build(sections: Section[]) {
     this.root.innerHTML = '';
     this.refreshers = [];
+    let group = '';
     for (const sec of sections) {
+      if (sec.group !== group) this.root.append(el('div', { class: 'panel-group' }, (group = sec.group)));
       this.sectionPaths = [];
       const body = el('div', { class: 'section-body' });
       for (const c of sec.controls) body.append(this.control(c));

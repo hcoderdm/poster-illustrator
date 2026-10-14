@@ -190,6 +190,13 @@ export interface Settings {
       offset: number; // pt between the map's border and the footer text
     };
   };
+  /** Where a searched place lands in the map area: offsets are % of the distance from centre to edge. */
+  target: {
+    offset: boolean;
+    up: number;
+    right: number;
+    at: [number, number] | null; // last searched place
+  };
   view: {
     center: [number, number];
     zoom: number;
@@ -568,6 +575,7 @@ export const DEFAULTS: Settings = {
       offset: 9,
     },
   },
+  target: { offset: false, up: 33, right: 0, at: null },
   view: {
     center: [-71.03, 42.33],
     zoom: 11.2,
